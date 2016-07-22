@@ -1,0 +1,1415 @@
+CCS PCM C Compiler, Version 4.121, 59578               05-jun-11 19:55
+
+               Filename: C:\Users\Daniel\PIC\Epoch\Epoch.lst
+
+               ROM used: 1179 words (58%)
+                         Largest free fragment is 869
+               RAM used: 53 (40%) at main() level
+                         85 (63%) worst case
+               Stack:    4 worst case (3 in main + 1 for interrupts)
+
+*
+0000:  NOP
+0001:  MOVLW  04
+0002:  MOVWF  0A
+0003:  GOTO   46E
+0004:  MOVWF  7F
+0005:  SWAPF  03,W
+0006:  CLRF   03
+0007:  MOVWF  21
+0008:  MOVF   7F,W
+0009:  MOVWF  20
+000A:  MOVF   0A,W
+000B:  MOVWF  27
+000C:  CLRF   0A
+000D:  SWAPF  20,F
+000E:  MOVF   04,W
+000F:  MOVWF  22
+0010:  MOVF   77,W
+0011:  MOVWF  23
+0012:  MOVF   78,W
+0013:  MOVWF  24
+0014:  MOVF   79,W
+0015:  MOVWF  25
+0016:  MOVF   7A,W
+0017:  MOVWF  26
+0018:  BCF    03.7
+0019:  BCF    03.5
+001A:  BTFSS  0B.5
+001B:  GOTO   01E
+001C:  BTFSC  0B.2
+001D:  GOTO   054
+001E:  MOVF   22,W
+001F:  MOVWF  04
+0020:  MOVF   23,W
+0021:  MOVWF  77
+0022:  MOVF   24,W
+0023:  MOVWF  78
+0024:  MOVF   25,W
+0025:  MOVWF  79
+0026:  MOVF   26,W
+0027:  MOVWF  7A
+0028:  MOVF   27,W
+0029:  MOVWF  0A
+002A:  SWAPF  21,W
+002B:  MOVWF  03
+002C:  SWAPF  7F,F
+002D:  SWAPF  7F,W
+002E:  RETFIE
+.................... // 
+.................... // Epoch - contador de segundos a partir da fundação do GHC 
+.................... // 
+....................  
+.................... #include <16f882.h> 
+.................... //////// Standard Header file for the PIC16F882 device //////////////// 
+.................... #device PIC16F882 
+.................... #list 
+....................  
+....................  
+.................... #device adc=8 
+.................... #use delay(clock=8000000) 
+.................... #fuses NOWDT, NOCPD, NOPROTECT 
+.................... #fuses MCLR, INTRC_IO 
+....................  
+.................... #use fast_io(A) 
+.................... #use fast_io(B) 
+.................... #use fast_io(C) 
+....................  
+.................... // Pinos utilizados 
+.................... #use rs232 (baud=9600, UART1) 
+....................  
+.................... #define  DS1302_CE   PIN_B0 
+.................... #define  DS1302_IO   PIN_B1 
+.................... #define  DS1302_SCLK PIN_B2 
+....................  
+.................... #define	 DISP_S0	PIN_C0 
+.................... #define	 DISP_S1	PIN_C1 
+.................... #define	 DISP_S2	PIN_C2 
+....................  
+.................... #define	LED		PIN_C3 
+....................  
+.................... #define TAXA_DISP 3     // taxa de varredura do display 
+.................... #define INTS_SEG  3906  // taxa de varredura do display 
+....................  
+.................... // Alguns registradores do DS1302 
+.................... #define  DS1302_WP   	0x0E 
+.................... #define  DS1302_TC   	0x10 
+.................... #define  DS1302_CBURST	0x3E 
+....................  
+.................... // Dias por mês      31 28 31  30  31  30  31  31  30  31  30 
+.................... const int dias[] = 	{ 0,31,59,90,120,151,181,212,243,273,304,334 }; 
+....................  
+.................... // Caracteres ASCII 
+.................... #define	BS	8 
+.................... #define	LF	10 
+.................... #define	CR	13 
+.................... #define	ESC	27 
+....................  
+.................... const char hexa[] = "0123456789ABCDEF"; 
+....................  
+.................... // EPOCH0 - fundação do GHC em segundos após 1/1/2000 00:00:00 
+.................... #define	EPOCH0	351549263L 
+....................  
+.................... // valor a apresentar no display 
+.................... int8 valor[16]; 
+....................  
+.................... // valor a programar no relogio (ddmmaahhmmss) 
+.................... int8 horario[12]; 
+....................  
+.................... // data/hora para o relogio 
+.................... byte relogio[8]; 
+....................  
+.................... // Rotinas locais 
+.................... void InitHw (void); 
+.................... void LoadClk (void); 
+.................... void TrataUart (void); 
+....................  
+.................... void DS1302_ReadClock (byte *regs); 
+.................... void DS1302_WriteClock (byte *regs); 
+.................... byte DS1302_Read (byte ender); 
+.................... void DS1302_Write (byte ender, byte dado); 
+.................... void DS1302_TxByte (byte b); 
+.................... byte DS1302_RxByte (); 
+....................  
+.................... // Ponto de entrada e loop principal 
+.................... void main (void) 
+.................... { 
+*
+046E:  CLRF   04
+046F:  BCF    03.7
+0470:  MOVLW  1F
+0471:  ANDWF  03,F
+0472:  BSF    03.5
+0473:  BSF    03.6
+0474:  BCF    07.3
+0475:  MOVLW  0C
+0476:  BCF    03.6
+0477:  MOVWF  19
+0478:  MOVLW  A2
+0479:  MOVWF  18
+047A:  MOVLW  90
+047B:  BCF    03.5
+047C:  MOVWF  18
+047D:  MOVLW  0F
+047E:  MOVWF  4D
+047F:  MOVLW  42
+0480:  MOVWF  4C
+0481:  MOVLW  03
+0482:  MOVWF  4E
+0483:  CLRF   4F
+0484:  BSF    03.5
+0485:  BSF    03.6
+0486:  MOVF   09,W
+0487:  ANDLW  C0
+0488:  MOVWF  09
+0489:  BCF    03.6
+048A:  BCF    1F.4
+048B:  BCF    1F.5
+048C:  MOVLW  00
+048D:  BSF    03.6
+048E:  MOVWF  08
+048F:  BCF    03.5
+0490:  CLRF   07
+0491:  CLRF   08
+0492:  CLRF   09
+.................... 	InitHw (); 
+0493:  BCF    03.6
+0494:  GOTO   0A0
+.................... 	LoadClk (); 
+0495:  CALL   159
+.................... 	enable_interrupts(GLOBAL); 
+0496:  MOVLW  C0
+0497:  IORWF  0B,F
+.................... 	for (;;) 
+.................... 	{ 
+.................... 		TrataUart(); 
+0498:  GOTO   37C
+.................... 	} 
+0499:  GOTO   498
+.................... } 
+....................  
+.................... // Iniciação do hardware 
+.................... void InitHw (void) 
+.................... { 
+049A:  GOTO   49A
+.................... 	// Bota para correr 
+.................... 	setup_oscillator (OSC_8MHZ); 
+*
+00A0:  MOVLW  71
+00A1:  BSF    03.5
+00A2:  MOVWF  0F
+00A3:  MOVF   0F,W
+....................  
+.................... 	// Dispositivos não usados 
+....................     setup_comparator(NC_NC); 
+00A4:  BCF    03.5
+00A5:  BSF    03.6
+00A6:  CLRF   07
+00A7:  CLRF   08
+00A8:  CLRF   09
+....................     setup_vref(FALSE); 
+00A9:  BSF    03.5
+00AA:  BCF    03.6
+00AB:  CLRF   17
+....................     setup_adc(ADC_OFF); 
+00AC:  BCF    03.5
+00AD:  BCF    1F.0
+....................  
+.................... 	// E/S 
+.................... 	set_tris_a (0x00);	// RA0-RA7 output 
+00AE:  MOVLW  00
+00AF:  BSF    03.5
+00B0:  MOVWF  05
+.................... 	set_tris_b (0xFA);	// RB0 e RB2 output 
+00B1:  MOVLW  FA
+00B2:  MOVWF  06
+.................... 	set_tris_c (0xF0);	// RC0-RC3 output 
+00B3:  MOVLW  F0
+00B4:  MOVWF  07
+.................... 	output_low (LED); 
+00B5:  BCF    03.5
+00B6:  BCF    07.3
+....................  
+.................... 	// Timer 
+....................     setup_timer_0(RTCC_INTERNAL|RTCC_DIV_2); 
+00B7:  BSF    03.5
+00B8:  MOVF   01,W
+00B9:  ANDLW  C0
+00BA:  MOVWF  01
+....................     setup_timer_1(T1_DISABLED); 
+00BB:  BCF    03.5
+00BC:  CLRF   10
+.................... 	enable_interrupts (INT_RTCC); 
+00BD:  BSF    0B.5
+....................  
+.................... 	// Uart 
+.................... 	while (kbhit()) 
+.................... 		getc(); 
+00BE:  BTFSS  0C.5
+00BF:  GOTO   0C4
+00C0:  BTFSS  0C.5
+00C1:  GOTO   0C0
+00C2:  MOVF   1A,W
+00C3:  GOTO   0BE
+.................... } 
+00C4:  GOTO   495 (RETURN)
+....................  
+.................... // Coloca no display o valor do relógio não volátil 
+.................... void LoadClk (void) 
+.................... { 
+.................... 	byte i, aux; 
+.................... 	unsigned int32 time; 
+....................  
+.................... 	DS1302_ReadClock (relogio); 
+*
+0159:  CLRF   59
+015A:  MOVLW  44
+015B:  MOVWF  58
+.................... 	if ((relogio[3] & 0x3F) == 0) 
+*
+0193:  MOVF   47,W
+0194:  ANDLW  3F
+0195:  BTFSS  03.2
+0196:  GOTO   1A4
+.................... 	{ 
+.................... 		// não programado 
+.................... 	    for (i = 0; i < 16; i++) 
+0197:  CLRF   52
+0198:  MOVF   52,W
+0199:  SUBLW  0F
+019A:  BTFSS  03.0
+019B:  GOTO   1A3
+.................... 	    { 
+.................... 	        valor[i] = 0; 
+019C:  MOVLW  28
+019D:  ADDWF  52,W
+019E:  MOVWF  04
+019F:  BCF    03.7
+01A0:  CLRF   00
+.................... 	    } 
+01A1:  INCF   52,F
+01A2:  GOTO   198
+.................... 		return; 
+01A3:  GOTO   36C
+.................... 	} 
+....................  
+....................     // Zera os bits não implementados no timer 
+....................     relogio[0] &= 0x7F; 
+01A4:  BCF    44.7
+....................     relogio[1] &= 0x7F; 
+01A5:  BCF    45.7
+....................     relogio[2] &= 0x3F; 
+01A6:  MOVLW  3F
+01A7:  ANDWF  46,F
+....................     relogio[3] &= 0x3F; 
+01A8:  ANDWF  47,F
+....................     relogio[4] &= 0x1F; 
+01A9:  MOVLW  1F
+01AA:  ANDWF  48,F
+....................  
+....................     // Converte valores BCD para binário 
+....................     for (i = 0; i < 7; i++) 
+01AB:  CLRF   52
+01AC:  MOVF   52,W
+01AD:  SUBLW  06
+01AE:  BTFSS  03.0
+01AF:  GOTO   1FD
+....................     { 
+....................         relogio[i] = (relogio[i] >> 4) * 10 + (relogio[i] & 0x0F); 
+01B0:  MOVLW  44
+01B1:  ADDWF  52,W
+01B2:  MOVWF  78
+01B3:  CLRF   7A
+01B4:  BTFSC  03.0
+01B5:  INCF   7A,F
+01B6:  MOVF   78,W
+01B7:  MOVWF  58
+01B8:  MOVF   7A,W
+01B9:  MOVWF  59
+01BA:  MOVLW  44
+01BB:  ADDWF  52,W
+01BC:  MOVWF  04
+01BD:  BCF    03.7
+01BE:  SWAPF  00,W
+01BF:  MOVWF  77
+01C0:  MOVLW  0F
+01C1:  ANDWF  77,F
+01C2:  MOVF   77,W
+01C3:  MOVWF  5B
+01C4:  MOVF   5B,W
+01C5:  MOVWF  5C
+01C6:  MOVLW  0A
+01C7:  MOVWF  5D
+*
+01EC:  MOVLW  44
+01ED:  ADDWF  52,W
+01EE:  MOVWF  04
+01EF:  BCF    03.7
+01F0:  MOVF   00,W
+01F1:  ANDLW  0F
+01F2:  ADDWF  78,W
+01F3:  MOVWF  5A
+01F4:  MOVF   58,W
+01F5:  MOVWF  04
+01F6:  BCF    03.7
+01F7:  BTFSC  59.0
+01F8:  BSF    03.7
+01F9:  MOVF   5A,W
+01FA:  MOVWF  00
+....................     } 
+01FB:  INCF   52,F
+01FC:  GOTO   1AC
+....................  
+....................     // Determina o número de dias nos anos inteiros 
+....................     // Na faixa 2000 a 2099 os anos divisíveis por 4 são bissextos 
+....................     // Cada grupo de 4 anos tem 3*365+366 dias 
+....................     time = ((unsigned int32) (relogio[6] >> 2)) * (3L*365L+366L); 
+01FD:  RRF    4A,W
+01FE:  MOVWF  77
+01FF:  RRF    77,F
+0200:  MOVLW  3F
+0201:  ANDWF  77,F
+0202:  MOVF   77,W
+0203:  CLRF   5C
+0204:  CLRF   5B
+0205:  CLRF   5A
+0206:  MOVWF  59
+0207:  MOVF   5C,W
+0208:  MOVWF  60
+0209:  MOVF   5B,W
+020A:  MOVWF  5F
+020B:  MOVF   5A,W
+020C:  MOVWF  5E
+020D:  MOVF   59,W
+020E:  MOVWF  5D
+020F:  CLRF   64
+0210:  CLRF   63
+0211:  MOVLW  05
+0212:  MOVWF  62
+0213:  MOVLW  B5
+0214:  MOVWF  61
+0215:  CALL   0E0
+0216:  MOVF   7A,W
+0217:  MOVWF  57
+0218:  MOVF   79,W
+0219:  MOVWF  56
+021A:  MOVF   78,W
+021B:  MOVWF  55
+021C:  MOVF   77,W
+021D:  MOVWF  54
+....................     aux = (relogio[6] & 3); 
+021E:  MOVF   4A,W
+021F:  ANDLW  03
+0220:  MOVWF  53
+....................     if (aux > 0) 
+0221:  MOVF   53,F
+0222:  BTFSC  03.2
+0223:  GOTO   256
+....................     { 
+....................         time += 366; 
+0224:  MOVLW  6E
+0225:  ADDWF  54,F
+0226:  MOVLW  01
+0227:  BTFSC  03.0
+0228:  MOVLW  02
+0229:  ADDWF  55,F
+022A:  MOVLW  00
+022B:  BTFSC  03.0
+022C:  MOVLW  01
+022D:  ADDWF  56,F
+022E:  MOVLW  00
+022F:  BTFSC  03.0
+0230:  MOVLW  01
+0231:  ADDWF  57,F
+....................         if (aux > 1) 
+0232:  MOVF   53,W
+0233:  SUBLW  01
+0234:  BTFSC  03.0
+0235:  GOTO   244
+....................             time += 365; 
+0236:  MOVLW  6D
+0237:  ADDWF  54,F
+0238:  MOVLW  01
+0239:  BTFSC  03.0
+023A:  MOVLW  02
+023B:  ADDWF  55,F
+023C:  MOVLW  00
+023D:  BTFSC  03.0
+023E:  MOVLW  01
+023F:  ADDWF  56,F
+0240:  MOVLW  00
+0241:  BTFSC  03.0
+0242:  MOVLW  01
+0243:  ADDWF  57,F
+....................         if (aux > 2) 
+0244:  MOVF   53,W
+0245:  SUBLW  02
+0246:  BTFSC  03.0
+0247:  GOTO   256
+....................             time += 365; 
+0248:  MOVLW  6D
+0249:  ADDWF  54,F
+024A:  MOVLW  01
+024B:  BTFSC  03.0
+024C:  MOVLW  02
+024D:  ADDWF  55,F
+024E:  MOVLW  00
+024F:  BTFSC  03.0
+0250:  MOVLW  01
+0251:  ADDWF  56,F
+0252:  MOVLW  00
+0253:  BTFSC  03.0
+0254:  MOVLW  01
+0255:  ADDWF  57,F
+....................     } 
+....................  
+....................     // Soma os dias até a data atual 
+....................     time += dias[relogio[4]-1]; 
+0256:  MOVLW  01
+0257:  SUBWF  48,W
+0258:  CALL   02F
+0259:  MOVWF  78
+025A:  ADDWF  54,F
+025B:  MOVLW  00
+025C:  BTFSC  03.0
+025D:  MOVLW  01
+025E:  ADDWF  55,F
+025F:  MOVLW  00
+0260:  BTFSC  03.0
+0261:  MOVLW  01
+0262:  ADDWF  56,F
+0263:  MOVLW  00
+0264:  BTFSC  03.0
+0265:  MOVLW  01
+0266:  ADDWF  57,F
+....................     if ((aux == 0) && (relogio[4] > 2)) 
+0267:  MOVF   53,F
+0268:  BTFSS  03.2
+0269:  GOTO   276
+026A:  MOVF   48,W
+026B:  SUBLW  02
+026C:  BTFSC  03.0
+026D:  GOTO   276
+....................         time++;      // ano bissexto 
+026E:  MOVLW  01
+026F:  ADDWF  54,F
+0270:  BTFSC  03.0
+0271:  INCF   55,F
+0272:  BTFSC  03.2
+0273:  INCF   56,F
+0274:  BTFSC  03.2
+0275:  INCF   57,F
+....................     time += relogio[3]-1; 
+0276:  MOVLW  01
+0277:  SUBWF  47,W
+0278:  ADDWF  54,F
+0279:  MOVLW  00
+027A:  BTFSC  03.0
+027B:  MOVLW  01
+027C:  ADDWF  55,F
+027D:  MOVLW  00
+027E:  BTFSC  03.0
+027F:  MOVLW  01
+0280:  ADDWF  56,F
+0281:  MOVLW  00
+0282:  BTFSC  03.0
+0283:  MOVLW  01
+0284:  ADDWF  57,F
+....................  
+....................     // Soma as horas 
+....................     time = time*24UL + (unsigned int32) relogio[2]; 
+0285:  MOVF   57,W
+0286:  MOVWF  60
+0287:  MOVF   56,W
+0288:  MOVWF  5F
+0289:  MOVF   55,W
+028A:  MOVWF  5E
+028B:  MOVF   54,W
+028C:  MOVWF  5D
+028D:  CLRF   64
+028E:  CLRF   63
+028F:  CLRF   62
+0290:  MOVLW  18
+0291:  MOVWF  61
+0292:  CALL   0E0
+0293:  MOVF   7A,W
+0294:  MOVWF  5B
+0295:  MOVF   79,W
+0296:  MOVWF  5A
+0297:  MOVF   78,W
+0298:  MOVWF  59
+0299:  MOVF   77,W
+029A:  MOVWF  58
+029B:  CLRF   78
+029C:  CLRF   79
+029D:  CLRF   7A
+029E:  MOVF   46,W
+029F:  ADDWF  58,W
+02A0:  MOVWF  54
+02A1:  MOVF   59,W
+02A2:  MOVWF  55
+02A3:  MOVF   78,W
+02A4:  BTFSC  03.0
+02A5:  INCFSZ 78,W
+02A6:  ADDWF  55,F
+02A7:  MOVF   5A,W
+02A8:  MOVWF  56
+02A9:  MOVF   79,W
+02AA:  BTFSC  03.0
+02AB:  INCFSZ 79,W
+02AC:  ADDWF  56,F
+02AD:  MOVF   5B,W
+02AE:  MOVWF  57
+02AF:  MOVF   7A,W
+02B0:  BTFSC  03.0
+02B1:  INCFSZ 7A,W
+02B2:  ADDWF  57,F
+....................  
+....................     // Soma os minutos 
+....................     time = time*60UL + (unsigned int32) relogio[1]; 
+02B3:  MOVF   57,W
+02B4:  MOVWF  60
+02B5:  MOVF   56,W
+02B6:  MOVWF  5F
+02B7:  MOVF   55,W
+02B8:  MOVWF  5E
+02B9:  MOVF   54,W
+02BA:  MOVWF  5D
+02BB:  CLRF   64
+02BC:  CLRF   63
+02BD:  CLRF   62
+02BE:  MOVLW  3C
+02BF:  MOVWF  61
+02C0:  CALL   0E0
+02C1:  MOVF   7A,W
+02C2:  MOVWF  5B
+02C3:  MOVF   79,W
+02C4:  MOVWF  5A
+02C5:  MOVF   78,W
+02C6:  MOVWF  59
+02C7:  MOVF   77,W
+02C8:  MOVWF  58
+02C9:  CLRF   78
+02CA:  CLRF   79
+02CB:  CLRF   7A
+02CC:  MOVF   45,W
+02CD:  ADDWF  58,W
+02CE:  MOVWF  54
+02CF:  MOVF   59,W
+02D0:  MOVWF  55
+02D1:  MOVF   78,W
+02D2:  BTFSC  03.0
+02D3:  INCFSZ 78,W
+02D4:  ADDWF  55,F
+02D5:  MOVF   5A,W
+02D6:  MOVWF  56
+02D7:  MOVF   79,W
+02D8:  BTFSC  03.0
+02D9:  INCFSZ 79,W
+02DA:  ADDWF  56,F
+02DB:  MOVF   5B,W
+02DC:  MOVWF  57
+02DD:  MOVF   7A,W
+02DE:  BTFSC  03.0
+02DF:  INCFSZ 7A,W
+02E0:  ADDWF  57,F
+....................  
+....................     // Soma os segundos 
+....................     time = time*60UL + (unsigned int32) relogio[0]; 
+02E1:  MOVF   57,W
+02E2:  MOVWF  60
+02E3:  MOVF   56,W
+02E4:  MOVWF  5F
+02E5:  MOVF   55,W
+02E6:  MOVWF  5E
+02E7:  MOVF   54,W
+02E8:  MOVWF  5D
+02E9:  CLRF   64
+02EA:  CLRF   63
+02EB:  CLRF   62
+02EC:  MOVLW  3C
+02ED:  MOVWF  61
+02EE:  CALL   0E0
+02EF:  MOVF   7A,W
+02F0:  MOVWF  5B
+02F1:  MOVF   79,W
+02F2:  MOVWF  5A
+02F3:  MOVF   78,W
+02F4:  MOVWF  59
+02F5:  MOVF   77,W
+02F6:  MOVWF  58
+02F7:  CLRF   78
+02F8:  CLRF   79
+02F9:  CLRF   7A
+02FA:  MOVF   44,W
+02FB:  ADDWF  58,W
+02FC:  MOVWF  54
+02FD:  MOVF   59,W
+02FE:  MOVWF  55
+02FF:  MOVF   78,W
+0300:  BTFSC  03.0
+0301:  INCFSZ 78,W
+0302:  ADDWF  55,F
+0303:  MOVF   5A,W
+0304:  MOVWF  56
+0305:  MOVF   79,W
+0306:  BTFSC  03.0
+0307:  INCFSZ 79,W
+0308:  ADDWF  56,F
+0309:  MOVF   5B,W
+030A:  MOVWF  57
+030B:  MOVF   7A,W
+030C:  BTFSC  03.0
+030D:  INCFSZ 7A,W
+030E:  ADDWF  57,F
+....................  
+.................... 	// Contar a partir do EPOCH0 
+.................... 	time -= EPOCH0; 
+030F:  MOVLW  4F
+0310:  SUBWF  54,F
+0311:  MOVLW  37
+0312:  BTFSS  03.0
+0313:  MOVLW  38
+0314:  SUBWF  55,F
+0315:  MOVLW  F4
+0316:  BTFSS  03.0
+0317:  MOVLW  F5
+0318:  SUBWF  56,F
+0319:  MOVLW  14
+031A:  BTFSS  03.0
+031B:  MOVLW  15
+031C:  SUBWF  57,F
+....................  
+.................... 	// coloca no valor do display 
+.................... 	disable_interrupts (INT_RTCC); 
+031D:  BCF    0B.5
+.................... 	for (i = 0; i < 16; i++) 
+031E:  CLRF   52
+031F:  MOVF   52,W
+0320:  SUBLW  0F
+0321:  BTFSS  03.0
+0322:  GOTO   36B
+.................... 	{ 
+.................... 		valor[15-i] = time % 10L; 
+0323:  MOVF   52,W
+0324:  SUBLW  0F
+0325:  ADDLW  28
+0326:  MOVWF  78
+0327:  CLRF   7A
+0328:  BTFSC  03.0
+0329:  INCF   7A,F
+032A:  MOVF   78,W
+032B:  MOVWF  58
+032C:  MOVF   7A,W
+032D:  MOVWF  59
+032E:  CLRF   5B
+032F:  MOVF   04,W
+0330:  MOVWF  5A
+0331:  BCF    5B.0
+0332:  BTFSC  03.7
+0333:  BSF    5B.0
+0334:  BSF    03.1
+0335:  MOVLW  5C
+0336:  MOVWF  04
+0337:  BCF    03.7
+0338:  MOVF   57,W
+0339:  MOVWF  63
+033A:  MOVF   56,W
+033B:  MOVWF  62
+033C:  MOVF   55,W
+033D:  MOVWF  61
+033E:  MOVF   54,W
+033F:  MOVWF  60
+0340:  CLRF   67
+0341:  CLRF   66
+0342:  CLRF   65
+0343:  MOVLW  0A
+0344:  MOVWF  64
+0345:  CALL   10A
+0346:  MOVF   5A,W
+0347:  MOVWF  04
+0348:  BCF    03.7
+0349:  BTFSC  5B.0
+034A:  BSF    03.7
+034B:  MOVF   58,W
+034C:  MOVWF  04
+034D:  BCF    03.7
+034E:  BTFSC  59.0
+034F:  BSF    03.7
+0350:  MOVF   5C,W
+0351:  MOVWF  00
+.................... 		time = time / 10L; 
+0352:  BCF    03.1
+0353:  MOVF   57,W
+0354:  MOVWF  63
+0355:  MOVF   56,W
+0356:  MOVWF  62
+0357:  MOVF   55,W
+0358:  MOVWF  61
+0359:  MOVF   54,W
+035A:  MOVWF  60
+035B:  CLRF   67
+035C:  CLRF   66
+035D:  CLRF   65
+035E:  MOVLW  0A
+035F:  MOVWF  64
+0360:  CALL   10A
+0361:  MOVF   7A,W
+0362:  MOVWF  57
+0363:  MOVF   79,W
+0364:  MOVWF  56
+0365:  MOVF   78,W
+0366:  MOVWF  55
+0367:  MOVF   77,W
+0368:  MOVWF  54
+.................... 	} 
+0369:  INCF   52,F
+036A:  GOTO   31F
+.................... 	enable_interrupts (INT_RTCC); 
+036B:  BSF    0B.5
+.................... } 
+036C:  RETURN
+....................  
+.................... // Trata comunicação com o PC 
+.................... void TrataUart (void) 
+.................... { 
+.................... 	char c; 
+.................... 	int i; 
+....................  
+.................... 	if (kbhit()) 
+*
+037C:  BTFSS  0C.5
+037D:  GOTO   46D
+.................... 	{ 
+.................... 		c = getc(); 
+037E:  BTFSS  0C.5
+037F:  GOTO   37E
+0380:  MOVF   1A,W
+0381:  MOVWF  50
+.................... 		if (c != CR) 
+0382:  MOVF   50,W
+0383:  SUBLW  0D
+0384:  BTFSS  03.2
+.................... 			return; 
+0385:  GOTO   46D
+....................  
+.................... 		output_high (LED); 
+0386:  BSF    07.3
+.................... 		putchar (CR); 
+0387:  MOVLW  0D
+0388:  BTFSS  0C.4
+0389:  GOTO   388
+038A:  MOVWF  19
+.................... 		putchar (LF); 
+038B:  MOVLW  0A
+038C:  BTFSS  0C.4
+038D:  GOTO   38C
+038E:  MOVWF  19
+.................... 		putchar ('>'); 
+038F:  MOVLW  3E
+0390:  BTFSS  0C.4
+0391:  GOTO   390
+0392:  MOVWF  19
+.................... 		i = c = 0; 
+0393:  CLRF   50
+0394:  MOVF   50,W
+0395:  MOVWF  51
+.................... 		//ddmmaahhmmss 
+.................... 		while ((c != CR) || (i != 12)) 
+.................... 		{ 
+0396:  MOVF   50,W
+0397:  SUBLW  0D
+0398:  BTFSS  03.2
+0399:  GOTO   39E
+039A:  MOVF   51,W
+039B:  SUBLW  0C
+039C:  BTFSC  03.2
+039D:  GOTO   3D7
+.................... 			c = getc(); 
+039E:  BTFSS  0C.5
+039F:  GOTO   39E
+03A0:  MOVF   1A,W
+03A1:  MOVWF  50
+.................... 			if ((c == ESC) || (c == 0)) 
+03A2:  MOVF   50,W
+03A3:  SUBLW  1B
+03A4:  BTFSC  03.2
+03A5:  GOTO   3A8
+03A6:  MOVF   50,F
+03A7:  BTFSC  03.2
+.................... 				break; 
+03A8:  GOTO   3D7
+.................... 			if ((c == BS) && (i > 0)) 
+03A9:  MOVF   50,W
+03AA:  SUBLW  08
+03AB:  BTFSS  03.2
+03AC:  GOTO   3BE
+03AD:  MOVF   51,F
+03AE:  BTFSC  03.2
+03AF:  GOTO   3BE
+.................... 			{ 
+.................... 				putchar(BS); 
+03B0:  MOVLW  08
+03B1:  BTFSS  0C.4
+03B2:  GOTO   3B1
+03B3:  MOVWF  19
+.................... 				putchar(' '); 
+03B4:  MOVLW  20
+03B5:  BTFSS  0C.4
+03B6:  GOTO   3B5
+03B7:  MOVWF  19
+.................... 				putchar(BS); 
+03B8:  MOVLW  08
+03B9:  BTFSS  0C.4
+03BA:  GOTO   3B9
+03BB:  MOVWF  19
+.................... 				i--; 
+03BC:  DECF   51,F
+.................... 			} 
+.................... 			else if ((i < 12) && (c >= '0') && (c <= '9')) 
+03BD:  GOTO   3D6
+03BE:  MOVF   51,W
+03BF:  SUBLW  0B
+03C0:  BTFSS  03.0
+03C1:  GOTO   3D6
+03C2:  MOVF   50,W
+03C3:  SUBLW  2F
+03C4:  BTFSC  03.0
+03C5:  GOTO   3D6
+03C6:  MOVF   50,W
+03C7:  SUBLW  39
+03C8:  BTFSS  03.0
+03C9:  GOTO   3D6
+.................... 			{ 
+.................... 				putchar(c); 
+03CA:  MOVF   50,W
+03CB:  BTFSS  0C.4
+03CC:  GOTO   3CB
+03CD:  MOVWF  19
+.................... 				horario[i++] = c-'0'; 
+03CE:  MOVF   51,W
+03CF:  INCF   51,F
+03D0:  ADDLW  38
+03D1:  MOVWF  04
+03D2:  BCF    03.7
+03D3:  MOVLW  30
+03D4:  SUBWF  50,W
+03D5:  MOVWF  00
+.................... 			} 
+.................... 		} 
+03D6:  GOTO   396
+.................... 		putchar (CR); 
+03D7:  MOVLW  0D
+03D8:  BTFSS  0C.4
+03D9:  GOTO   3D8
+03DA:  MOVWF  19
+.................... 		putchar (LF); 
+03DB:  MOVLW  0A
+03DC:  BTFSS  0C.4
+03DD:  GOTO   3DC
+03DE:  MOVWF  19
+.................... 		if (c != ESC) 
+03DF:  MOVF   50,W
+03E0:  SUBLW  1B
+03E1:  BTFSC  03.2
+03E2:  GOTO   46C
+.................... 		{ 
+.................... 			relogio[0] = (horario[10] << 4) | horario[11]; 
+03E3:  SWAPF  42,W
+03E4:  MOVWF  77
+03E5:  MOVLW  F0
+03E6:  ANDWF  77,F
+03E7:  MOVF   77,W
+03E8:  IORWF  43,W
+03E9:  MOVWF  44
+.................... 			relogio[1] = (horario[8] << 4) | horario[9]; 
+03EA:  SWAPF  40,W
+03EB:  MOVWF  77
+03EC:  MOVLW  F0
+03ED:  ANDWF  77,F
+03EE:  MOVF   77,W
+03EF:  IORWF  41,W
+03F0:  MOVWF  45
+.................... 			relogio[2] = (horario[6] << 4) | horario[7]; 
+03F1:  SWAPF  3E,W
+03F2:  MOVWF  77
+03F3:  MOVLW  F0
+03F4:  ANDWF  77,F
+03F5:  MOVF   77,W
+03F6:  IORWF  3F,W
+03F7:  MOVWF  46
+.................... 			relogio[3] = (horario[0] << 4) | horario[1]; 
+03F8:  SWAPF  38,W
+03F9:  MOVWF  77
+03FA:  MOVLW  F0
+03FB:  ANDWF  77,F
+03FC:  MOVF   77,W
+03FD:  IORWF  39,W
+03FE:  MOVWF  47
+.................... 			relogio[4] = (horario[2] << 4) | horario[3]; 
+03FF:  SWAPF  3A,W
+0400:  MOVWF  77
+0401:  MOVLW  F0
+0402:  ANDWF  77,F
+0403:  MOVF   77,W
+0404:  IORWF  3B,W
+0405:  MOVWF  48
+.................... 			relogio[5] = 1; 
+0406:  MOVLW  01
+0407:  MOVWF  49
+.................... 			relogio[6] = (horario[4] << 4) | horario[5]; 
+0408:  SWAPF  3C,W
+0409:  MOVWF  77
+040A:  MOVLW  F0
+040B:  ANDWF  77,F
+040C:  MOVF   77,W
+040D:  IORWF  3D,W
+040E:  MOVWF  4A
+.................... 			relogio[7] = 0x80; 
+040F:  MOVLW  80
+0410:  MOVWF  4B
+....................  
+.................... 			for (i = 0; i < 8; i++) 
+0411:  CLRF   51
+0412:  MOVF   51,W
+0413:  SUBLW  07
+0414:  BTFSS  03.0
+0415:  GOTO   433
+.................... 			{ 
+.................... 				putchar (hexa[relogio[i] >> 4]); 
+0416:  MOVLW  44
+0417:  ADDWF  51,W
+0418:  MOVWF  04
+0419:  BCF    03.7
+041A:  SWAPF  00,W
+041B:  MOVWF  77
+041C:  MOVLW  0F
+041D:  ANDWF  77,F
+041E:  MOVF   77,W
+041F:  CALL   03F
+0420:  BTFSS  0C.4
+0421:  GOTO   420
+0422:  MOVWF  19
+.................... 				putchar (hexa[relogio[i] & 0x0F]); 
+0423:  MOVLW  44
+0424:  ADDWF  51,W
+0425:  MOVWF  04
+0426:  BCF    03.7
+0427:  MOVF   00,W
+0428:  ANDLW  0F
+0429:  CALL   03F
+042A:  BTFSS  0C.4
+042B:  GOTO   42A
+042C:  MOVWF  19
+.................... 				putchar (' '); 
+042D:  MOVLW  20
+042E:  BTFSS  0C.4
+042F:  GOTO   42E
+0430:  MOVWF  19
+.................... 			} 
+0431:  INCF   51,F
+0432:  GOTO   412
+.................... 			putchar (CR); 
+0433:  MOVLW  0D
+0434:  BTFSS  0C.4
+0435:  GOTO   434
+0436:  MOVWF  19
+.................... 			putchar (LF); 
+0437:  MOVLW  0A
+0438:  BTFSS  0C.4
+0439:  GOTO   438
+043A:  MOVWF  19
+....................  
+.................... 			DS1302_WriteClock (relogio); 
+043B:  CLRF   53
+043C:  MOVLW  44
+043D:  MOVWF  52
+.................... 			LoadClk (); 
+*
+046B:  CALL   159
+.................... 		} 
+.................... 		output_low (LED); 
+046C:  BCF    07.3
+.................... 	} 
+.................... } 
+046D:  GOTO   499 (RETURN)
+....................  
+.................... ////////////////////////////////////////////// 
+.................... // Interrupcao de tempo real 
+.................... // Ocorre a cada 512 uSeg 
+.................... #int_RTCC 
+.................... void RTCC_isr() 
+.................... { 
+.................... 	static unsigned int16 cont_seg = INTS_SEG; 
+....................     static unsigned int8 cont_disp = TAXA_DISP; 
+....................     static unsigned int8 disp = 0; 
+....................  
+....................     // Atualização da contagem de tempo 
+.................... 	if (--cont_seg == 0) 
+*
+0054:  MOVF   4C,W
+0055:  BTFSC  03.2
+0056:  DECF   4D,F
+0057:  DECFSZ 4C,F
+0058:  GOTO   075
+0059:  MOVF   4D,F
+005A:  BTFSS  03.2
+005B:  GOTO   075
+.................... 	{ 
+.................... 		int8 i=15; 
+005C:  MOVLW  0F
+005D:  MOVWF  6D
+.................... 		while ((i > 0) && (++valor[i] == 10)) 
+.................... 			valor[i--] = 0; 
+005E:  MOVF   6D,F
+005F:  BTFSC  03.2
+0060:  GOTO   071
+0061:  MOVLW  28
+0062:  ADDWF  6D,W
+0063:  MOVWF  04
+0064:  BCF    03.7
+0065:  INCF   00,F
+0066:  MOVF   00,W
+0067:  SUBLW  0A
+0068:  BTFSS  03.2
+0069:  GOTO   071
+006A:  MOVF   6D,W
+006B:  DECF   6D,F
+006C:  ADDLW  28
+006D:  MOVWF  04
+006E:  BCF    03.7
+006F:  CLRF   00
+0070:  GOTO   05E
+.................... 		cont_seg = INTS_SEG; 
+0071:  MOVLW  0F
+0072:  MOVWF  4D
+0073:  MOVLW  42
+0074:  MOVWF  4C
+.................... 	} 
+....................  
+....................     // Atualização do Display 
+....................     if (--cont_disp == 0) 
+0075:  DECFSZ 4E,F
+0076:  GOTO   09D
+....................     { 
+.................... 	    // seleciona o display atual 
+.................... 		if (disp & 1) 
+0077:  BTFSS  4F.0
+0078:  GOTO   07B
+.................... 			output_high (DISP_S0); 
+0079:  BSF    07.0
+.................... 		else 
+007A:  GOTO   07C
+.................... 			output_low (DISP_S0); 
+007B:  BCF    07.0
+.................... 		if (disp & 2) 
+007C:  BTFSS  4F.1
+007D:  GOTO   080
+.................... 			output_high (DISP_S1); 
+007E:  BSF    07.1
+.................... 		else 
+007F:  GOTO   081
+.................... 			output_low (DISP_S1); 
+0080:  BCF    07.1
+.................... 		if (disp & 4) 
+0081:  BTFSS  4F.2
+0082:  GOTO   085
+.................... 			output_high (DISP_S2); 
+0083:  BSF    07.2
+.................... 		else 
+0084:  GOTO   086
+.................... 			output_low (DISP_S2); 
+0085:  BCF    07.2
+.................... 	 
+.................... 	    // coloca os valores 
+.................... 		output_a ((valor[15-disp] << 4) | valor[disp]); 
+0086:  MOVF   4F,W
+0087:  SUBLW  0F
+0088:  ADDLW  28
+0089:  MOVWF  04
+008A:  BCF    03.7
+008B:  SWAPF  00,W
+008C:  MOVWF  6E
+008D:  MOVLW  F0
+008E:  ANDWF  6E,F
+008F:  MOVLW  28
+0090:  ADDWF  4F,W
+0091:  MOVWF  04
+0092:  BCF    03.7
+0093:  MOVF   00,W
+0094:  IORWF  6E,F
+0095:  MOVF   6E,W
+0096:  MOVWF  05
+.................... 	       
+.................... 	    // passa para o dígito seguinte 
+.................... 	    disp = (disp + 1) & 7; 
+0097:  MOVLW  01
+0098:  ADDWF  4F,W
+0099:  ANDLW  07
+009A:  MOVWF  4F
+....................       	cont_disp = TAXA_DISP; 
+009B:  MOVLW  03
+009C:  MOVWF  4E
+....................     } 
+.................... } 
+....................  
+.................... ////////////////////////////////////////////// 
+.................... // DS1302 - Relógio 
+....................  
+.................... // Lê relogio em modo burst 
+009D:  BCF    0B.2
+009E:  BCF    0A.3
+009F:  GOTO   01E
+.................... void DS1302_ReadClock (byte *regs) 
+.................... { 
+....................    byte i; 
+....................  
+....................    output_high (DS1302_CE); 
+*
+015C:  BSF    06.0
+....................    delay_us (4); 
+015D:  MOVLW  02
+015E:  MOVWF  77
+015F:  DECFSZ 77,F
+0160:  GOTO   15F
+0161:  NOP
+....................    DS1302_TxByte (DS1302_CBURST | 0x81); 
+0162:  MOVLW  BF
+0163:  MOVWF  5B
+0164:  CALL   0C5
+....................    for (i = 0; i < 8; i++) 
+0165:  CLRF   5A
+0166:  MOVF   5A,W
+0167:  SUBLW  07
+0168:  BTFSS  03.0
+0169:  GOTO   192
+....................    { 
+....................       *regs++ = DS1302_RxByte (); 
+016A:  MOVF   59,W
+016B:  MOVWF  7A
+016C:  MOVF   58,W
+016D:  INCF   58,F
+016E:  BTFSC  03.2
+016F:  INCF   59,F
+0170:  MOVWF  5B
+0171:  MOVF   7A,W
+0172:  MOVWF  5C
+*
+0184:  MOVF   5B,W
+0185:  MOVWF  04
+0186:  BCF    03.7
+0187:  BTFSC  5C.0
+0188:  BSF    03.7
+0189:  MOVF   78,W
+018A:  MOVWF  00
+....................       delay_us (4); 
+018B:  MOVLW  02
+018C:  MOVWF  77
+018D:  DECFSZ 77,F
+018E:  GOTO   18D
+018F:  NOP
+....................    } 
+0190:  INCF   5A,F
+0191:  GOTO   166
+....................    output_low (DS1302_CE); 
+0192:  BCF    06.0
+.................... } 
+....................  
+.................... // Escreve relogio em modo burst 
+.................... void DS1302_WriteClock (byte *regs) 
+.................... { 
+....................    byte i; 
+....................  
+....................    DS1302_Write (DS1302_WP, 0x00); 
+*
+043E:  MOVLW  0E
+043F:  MOVWF  55
+0440:  CLRF   56
+0441:  CALL   36D
+....................    DS1302_Write (DS1302_TC, 0xA9);	// tricle charger, 2 diodes, 2Kohms 
+0442:  MOVLW  10
+0443:  MOVWF  55
+0444:  MOVLW  A9
+0445:  MOVWF  56
+0446:  CALL   36D
+....................  
+....................    output_high (DS1302_CE); 
+0447:  BSF    06.0
+....................    delay_us (4); 
+0448:  MOVLW  02
+0449:  MOVWF  77
+044A:  DECFSZ 77,F
+044B:  GOTO   44A
+044C:  NOP
+....................    DS1302_TxByte (DS1302_CBURST | 0x80); 
+044D:  MOVLW  BE
+044E:  MOVWF  5B
+044F:  CALL   0C5
+....................    for (i = 0; i < 8; i++) 
+0450:  CLRF   54
+0451:  MOVF   54,W
+0452:  SUBLW  07
+0453:  BTFSS  03.0
+0454:  GOTO   46A
+....................    { 
+....................       DS1302_TxByte (*regs++); 
+0455:  MOVF   53,W
+0456:  MOVWF  7A
+0457:  MOVF   52,W
+0458:  INCF   52,F
+0459:  BTFSC  03.2
+045A:  INCF   53,F
+045B:  MOVWF  04
+045C:  BCF    03.7
+045D:  BTFSC  7A.0
+045E:  BSF    03.7
+045F:  MOVF   00,W
+0460:  MOVWF  55
+0461:  MOVWF  5B
+0462:  CALL   0C5
+....................       delay_us (4); 
+0463:  MOVLW  02
+0464:  MOVWF  77
+0465:  DECFSZ 77,F
+0466:  GOTO   465
+0467:  NOP
+....................    } 
+0468:  INCF   54,F
+0469:  GOTO   451
+....................    output_low (DS1302_CE); 
+046A:  BCF    06.0
+.................... } 
+....................  
+.................... // Lê um byte de um endereço do DS1302 
+.................... byte DS1302_Read (byte ender) 
+.................... { 
+....................    byte result; 
+....................     
+....................    output_high (DS1302_CE); 
+....................    delay_us (2); 
+....................    DS1302_TxByte (ender | 0x81); 
+....................    result = DS1302_RxByte (); 
+....................    delay_us (2); 
+....................    output_low (DS1302_CE); 
+....................    return result; 
+.................... } 
+....................  
+.................... // Escreve um byte em um endereço do DS1302 
+.................... void DS1302_Write (byte ender, byte dado) 
+.................... { 
+....................    output_high (DS1302_CE); 
+*
+036D:  BSF    06.0
+....................    delay_us (2); 
+036E:  GOTO   36F
+036F:  GOTO   370
+....................    DS1302_TxByte (ender | 0x80); 
+0370:  MOVF   55,W
+0371:  IORLW  80
+0372:  MOVWF  57
+0373:  MOVWF  5B
+0374:  CALL   0C5
+....................    DS1302_TxByte (dado); 
+0375:  MOVF   56,W
+0376:  MOVWF  5B
+0377:  CALL   0C5
+....................    delay_us (2); 
+0378:  GOTO   379
+0379:  GOTO   37A
+....................    output_low (DS1302_CE); 
+037A:  BCF    06.0
+.................... } 
+037B:  RETURN
+....................  
+.................... // Envia um byte ao DS1302 
+.................... void DS1302_TxByte (byte b) 
+.................... { 
+....................    int i; 
+....................     
+....................    set_tris_b (0xF8);	// I/O é output 
+*
+00C5:  MOVLW  F8
+00C6:  BSF    03.5
+00C7:  MOVWF  06
+....................    for (i = 0; i < 8; i++) 
+00C8:  BCF    03.5
+00C9:  CLRF   5C
+00CA:  MOVF   5C,W
+00CB:  SUBLW  07
+00CC:  BTFSS  03.0
+00CD:  GOTO   0DB
+....................    { 
+....................       if (b & 1) 
+00CE:  BTFSS  5B.0
+00CF:  GOTO   0D2
+....................          output_high (DS1302_IO); 
+00D0:  BSF    06.1
+....................       else 
+00D1:  GOTO   0D3
+....................          output_low (DS1302_IO); 
+00D2:  BCF    06.1
+....................       delay_us (1); 
+00D3:  GOTO   0D4
+....................       output_high (DS1302_SCLK); 
+00D4:  BSF    06.2
+....................       delay_us (1); 
+00D5:  GOTO   0D6
+....................       output_low (DS1302_SCLK); 
+00D6:  BCF    06.2
+....................       b = b >> 1; 
+00D7:  BCF    03.0
+00D8:  RRF    5B,F
+....................    } 
+00D9:  INCF   5C,F
+00DA:  GOTO   0CA
+....................    set_tris_b (0xFA);	// I/O volta a ser input 
+00DB:  MOVLW  FA
+00DC:  BSF    03.5
+00DD:  MOVWF  06
+.................... } 
+00DE:  BCF    03.5
+00DF:  RETURN
+....................  
+.................... // Recebe um byte do DS1302 
+.................... byte DS1302_RxByte () 
+.................... { 
+....................    int i; 
+....................    byte dado; 
+....................     
+....................    for (i = 0; i < 8; i++) 
+*
+0173:  CLRF   5D
+0174:  MOVF   5D,W
+0175:  SUBLW  07
+0176:  BTFSS  03.0
+0177:  GOTO   182
+....................    { 
+....................       delay_us (1); 
+0178:  GOTO   179
+....................       dado = dado >> 1; 
+0179:  BCF    03.0
+017A:  RRF    5E,F
+....................       if (input (DS1302_IO)) 
+017B:  BTFSC  06.1
+....................          dado |= 0x80; 
+017C:  BSF    5E.7
+....................       output_high (DS1302_SCLK); 
+017D:  BSF    06.2
+....................       delay_us (1); 
+017E:  GOTO   17F
+....................       output_low (DS1302_SCLK); 
+017F:  BCF    06.2
+....................    } 
+0180:  INCF   5D,F
+0181:  GOTO   174
+....................    return dado; 
+0182:  MOVF   5E,W
+0183:  MOVWF  78
+.................... } 
+....................  
+
+Configuration Fuses:
+   Word  1: 0CF4   INTRC_IO NOWDT NOPUT MCLR NOPROTECT NOCPD NOBROWNOUT IESO FCMEN NOLVP DEBUG
+   Word  2: 3FFF   BORV40
+
+   Some fuses have been forced to be compatible with the ICD debugger.
